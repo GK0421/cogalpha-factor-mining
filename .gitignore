@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env
+.venv
+
+# Configuration with secrets
+config.yaml
+.env
+*.key
+
+# Data & results (large files)
+data/*.parquet
+data/*.h5
+data/*.csv
+data/*.pkl
+results/*
+logs/*
+!data/.gitkeep
+!results/.gitkeep
+!results/final_factor_library/.gitkeep
+
+# Pytest
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
