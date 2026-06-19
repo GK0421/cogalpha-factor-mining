@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cogalpha-factor-mining"
+version = "0.1.0"
+description = "CogAlpha全自动因子挖掘框架 MVP"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "CogAlpha Team"}]
+keywords = ["quant", "factor-mining", "alpha", "llm", "evolution"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "pandas>=1.4",
+    "numpy>=1.21",
+    "scipy>=1.7",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.0",
+    "tqdm>=4.60",
+    "tenacity>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "openai>=1.0",
+]
+
+[project.scripts]
+cogalpha = "cogalpha.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"

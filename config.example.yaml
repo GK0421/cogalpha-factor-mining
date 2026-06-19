@@ -1,0 +1,62 @@
+# CogAlpha Configuration Template
+# Copy this file to config.yaml and fill in real values.
+# NEVER commit config.yaml or .env to version control.
+
+api:
+  # Mock provider is used by default. Real LLM providers require API keys via environment variables.
+  provider: "mock"  # Options: "mock", "openai"
+  openai:
+    # Set via environment variable: OPENAI_API_KEY
+    api_key: "${OPENAI_API_KEY}"  # Do NOT put real key here
+    base_url: "https://api.openai.com/v1"
+    model: "gpt-4o-mini"
+    max_concurrent_requests: 5
+    max_tokens: 2048
+    timeout: 60
+    temperature: 0.7
+  deepseek:
+    base_url: "https://api.deepseek.com/v1"
+    model: "deepseek-chat"
+  qwen:
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "qwen-max"
+
+data:
+  path: "./data/synthetic_ohlcv.parquet"
+  train_start: "2011-01-01"
+  train_end: "2019-12-31"
+  test_start: "2020-01-01"
+  test_end: "2025-12-31"
+  symbols: ["A", "B", "C"]  # Synthetic symbols for MVP
+
+evolution:
+  initial_population_size: 8
+  parent_pool_size: 4
+  offspring_multiplier: 3
+  sub_cycle_generations: 8
+  total_generations: 4
+  mutation_rate: 0.4
+  crossover_rate: 0.3
+  injection_interval: 2
+  elite_preserve_num: 2
+
+agent_config:
+  total_agents: 21
+  generation_mode_probability: [0.2, 0.2, 0.2, 0.2, 0.2]
+  temperature_range_per_mode:
+    mild: [0.1, 0.3]
+    moderate: [0.3, 0.5]
+    creative: [0.5, 0.7]
+    divergent: [0.7, 0.9]
+    concrete: [0.5, 0.7]
+  max_retry_on_error: 3
+
+paths:
+  prompt_templates: "./prompts/"
+  output_factors: "./results/elite_factors/"
+  final_library: "./results/final_factor_library/"
+  logs: "./logs/"
+
+logging:
+  level: "INFO"
+  suppress_api_keys: true
