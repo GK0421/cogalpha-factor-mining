@@ -3,31 +3,49 @@
 # NEVER commit config.yaml or .env to version control.
 
 api:
-  # Mock provider is used by default. Real LLM providers require API keys via environment variables.
-  provider: "mock"  # Options: "mock", "openai"
+  # Provider selection: "mock" (default, no API key needed), "openai", "deepseek", "qwen"
+  provider: "mock"
+
+  # OpenAI-compatible provider (also works for DeepSeek, Qwen, and other compatible endpoints)
   openai:
     # Set via environment variable: OPENAI_API_KEY
-    api_key: "${OPENAI_API_KEY}"  # Do NOT put real key here
+    api_key: "${OPENAI_API_KEY}"
     base_url: "https://api.openai.com/v1"
     model: "gpt-4o-mini"
     max_concurrent_requests: 5
     max_tokens: 2048
     timeout: 60
     temperature: 0.7
+
   deepseek:
-    base_url: "https://api.deepseek.com/v1"
-    model: "deepseek-chat"
+    # Set via environment variable: DEEPSEEK_API_KEY
+    api_key: "${DEEPSEEK_API_KEY}"
+    base_url: "${DEEPSEEK_BASE_URL}"  # e.g. https://api.deepseek.com/v1
+    model: "${DEEPSEEK_MODEL}"  # e.g. deepseek-chat
+    max_concurrent_requests: 5
+    max_tokens: 2048
+    timeout: 60
+    temperature: 0.7
+
   qwen:
     base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     model: "qwen-max"
+    max_concurrent_requests: 5
+    max_tokens: 2048
+    timeout: 60
+    temperature: 0.7
 
 data:
-  path: "./data/synthetic_ohlcv.parquet"
+  # Data source: "synthetic" (default) or "akshare" (real A-share data via AKShare)
+  source: "synthetic"
+  path: "./data/ashare_daily.parquet"
   train_start: "2011-01-01"
   train_end: "2019-12-31"
   test_start: "2020-01-01"
   test_end: "2025-12-31"
   symbols: ["A", "B", "C"]  # Synthetic symbols for MVP
+  # For real data: adjust type: "qfq" (pre-adjusted), "hfq" (post-adjusted), "" (none)
+  adjust: "qfq"
 
 evolution:
   initial_population_size: 8

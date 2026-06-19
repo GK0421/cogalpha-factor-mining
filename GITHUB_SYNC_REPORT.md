@@ -18,7 +18,8 @@
 |--------|------|
 | 本地分支存在 | ✅ feature/cogalpha-mvp |
 | 远程仓库已配置 | ✅ origin: https://github.com/GK0421/cogalpha-factor-mining.git |
-| 代码已提交 | ✅ 5 commits |
+| 代码已提交 | ✅ 6+ commits |
+| 已推送至远程分支 | ✅ `git push origin feature/cogalpha-mvp` 成功 |
 | 敏感文件已排除 | ✅ .gitignore 正确配置 |
 | 测试全部通过 | ✅ 53/53 passed |
 | MVP 端到端运行 | ✅ examples/run_mvp.py 成功运行 |
