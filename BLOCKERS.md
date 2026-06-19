@@ -17,10 +17,11 @@
 - **下一步**：推送后检查首次Actions运行结果
 
 ### 3. DeepSeek API Key（已解决）
-- **问题**：旧 Key `sk-mFXaY8U2q9oJXIaC2CMtcAZD5TkfdJ5yNoIxGz3yRUHhLywWnOO4nyda2j9830S7` 返回 401
-- **解决**：更换为有效 Key `sk-7c538130996542898bb0b650f182f1cc`，API 连通性 OK
+- **问题**：旧 Key `sk-REDACTED` 返回 401
+- **解决**：更换为有效 Key `sk-REDACTED`，API 连通性 OK
 - **验证**：`python -m cogalpha.cli run-mvp --config config.yaml` 成功运行，8 个生成 → 6 个有效
 - **状态**：`.env` 已更新，已加入 `.gitignore`，不会泄露到 GitHub
+- **安全提醒**：运行环境验证时使用的 Key 已暴露，建议到 DeepSeek 平台 rotate Key
 
 ## 当前阻塞项
 
