@@ -20,9 +20,31 @@ class OpenAIConfig(BaseModel):
     temperature: float = 0.7
 
 
+class DeepSeekConfig(BaseModel):
+    api_key: str = "${DEEPSEEK_API_KEY}"
+    base_url: str = "https://api.deepseek.com/v1"
+    model: str = "deepseek-chat"
+    max_concurrent_requests: int = 5
+    max_tokens: int = 2048
+    timeout: int = 60
+    temperature: float = 0.7
+
+
+class QwenConfig(BaseModel):
+    api_key: str = "${QWEN_API_KEY}"
+    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: str = "qwen-max"
+    max_concurrent_requests: int = 5
+    max_tokens: int = 2048
+    timeout: int = 60
+    temperature: float = 0.7
+
+
 class APIConfig(BaseModel):
     provider: str = "mock"
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
+    deepseek: DeepSeekConfig = Field(default_factory=DeepSeekConfig)
+    qwen: QwenConfig = Field(default_factory=QwenConfig)
 
 
 class DataConfig(BaseModel):

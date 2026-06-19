@@ -146,3 +146,20 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 max_tokens=max_tokens,
                 timeout=timeout,
             )
+
+    def generate_sync(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        timeout: int = 60,
+    ) -> str:
+        """Synchronous wrapper for :meth:`generate`."""
+        return asyncio.run(
+            self.generate(
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+            )
+        )

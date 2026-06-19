@@ -199,16 +199,21 @@ class FactorEvaluator:
             raise TypeError("factor must be a FactorObject")
         code = factor.raw_code
         namespace = {"pd": pd, "np": np}
-        exec(code, namespace)
-        tree = ast.parse(code)
-        func_names = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-        if not func_names:
-            raise ValueError("No function found in factor code")
-        func = namespace[func_names[0]]
-        factor_values = func(self.df)
-        metrics = self.evaluate(factor_values, period=1, split="train")
-        factor.metrics = metrics
-        return metrics
+        try:
+            exec(code, namespace)
+            tree = ast.parse(code)
+            func_names = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+            if not func_names:
+                raise ValueError("No function found in factor code")
+            func = namespace[func_names[0]]
+            factor_values = func(self.df)
+            metrics = self.evaluate(factor_values, period=1, split="train")
+            factor.metrics = metrics
+            return metrics
+        except Exception as e:
+            factor.errors.append(f"evaluation_error: {type(e).__name__}: {e}")
+            factor.status = "invalid"
+            return {}
 
     def evaluate_all(self, factors: list[pd.Series]) -> list[dict]:
         """Evaluate a list of factors and return metrics for each."""

@@ -1,5 +1,6 @@
 """CLI for CogAlpha factor mining."""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -7,12 +8,48 @@ from cogalpha.config import load_config
 from cogalpha.data.synthetic import generate_synthetic_ohlcv, save_synthetic, load_synthetic
 from cogalpha.data.validator import DataValidator
 from cogalpha.llm.mock_provider import MockLLMProvider
+from cogalpha.llm.openai_provider import OpenAICompatibleProvider
 from cogalpha.factors.parser import FactorParser
 from cogalpha.factors.quality import QualityChecker
 from cogalpha.factors.leakage import LeakageDetector
 from cogalpha.factors.evaluator import FactorEvaluator
 from cogalpha.reports.report_writer import ReportWriter
 from cogalpha.agents.agent import AgentRegistry
+
+
+def _get_llm_provider(config):
+    """Create LLM provider based on config."""
+    provider_name = config.api.provider.lower()
+    if provider_name == "mock":
+        return MockLLMProvider()
+    elif provider_name in ("openai", "deepseek", "qwen"):
+        # Map provider name to config section
+        if provider_name == "openai":
+            cfg = config.api.openai
+        elif provider_name == "deepseek":
+            cfg = config.api.deepseek
+        elif provider_name == "qwen":
+            cfg = config.api.qwen
+        else:
+            cfg = config.api.openai
+        
+        api_key = cfg.api_key
+        if not api_key or api_key.startswith("${"):
+            raise ValueError(
+                f"API key for provider '{provider_name}' is not set. "
+                f"Please set it via environment variable or in .env file."
+            )
+        return OpenAICompatibleProvider(
+            api_key=api_key,
+            base_url=cfg.base_url,
+            model=cfg.model,
+            max_concurrent=cfg.max_concurrent_requests,
+            max_tokens=cfg.max_tokens,
+            timeout=cfg.timeout,
+            temperature=cfg.temperature,
+        )
+    else:
+        raise ValueError(f"Unknown provider: {provider_name}")
 
 
 def cmd_init(args):
@@ -59,8 +96,9 @@ def cmd_run_mvp(args):
         df = load_synthetic(data_path)
     print(f"Loaded data: {len(df)} rows")
 
-    # 2. Mock LLM provider
-    llm = MockLLMProvider()
+    # 2. Select LLM provider based on config
+    print(f"Using LLM provider: {config.api.provider}")
+    llm = _get_llm_provider(config)
     agents = AgentRegistry(llm_provider=llm)
     raw_outputs = agents.generate_batch(batch_size=config.evolution.initial_population_size)
     print(f"Generated {len(raw_outputs)} raw factor outputs")
@@ -91,12 +129,15 @@ def cmd_run_mvp(args):
     )
     for f in valid_factors:
         evaluator.evaluate_factor(f)
+        if f.status == "invalid":
+            continue
         # Elite threshold: composite_score > 0.15
         if f.metrics.get("composite_score", 0) > 0.15:
             f.status = "elite"
         else:
             f.status = "valid"
-    print(f"Evaluated {len(valid_factors)} factors")
+    evaluated_count = len([f for f in valid_factors if f.status != "invalid"])
+    print(f"Evaluated {evaluated_count} factors")
 
     # 7. Save reports
     output_dir = Path(config.paths.final_library)
