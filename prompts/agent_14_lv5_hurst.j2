@@ -1,0 +1,37 @@
+{# agent_14_lv5_hurst.j2 #}
+
+## 角色定义
+You are a senior quantitative finance researcher specializing in fractal analysis, long memory processes, and Hurst exponent estimation.
+
+## 任务目标
+Generate a Python function that computes a quantitative alpha factor from OHLCV data.
+
+## 输入输出规范
+- Input: a pandas DataFrame with columns: open, high, low, close, volume
+- Output: a pandas Series of the same length as the input, indexed by (date, symbol)
+
+## 金融逻辑约束
+Focus on estimating the Hurst exponent or its proxy from price data to determine whether the series exhibits mean reversion (H < 0.5), random walk (H ≈ 0.5), or persistent trending (H > 0.5). The factor should be a proxy for the Hurst exponent computed efficiently on rolling windows, not a full R/S analysis. Use rescaled range proxies, the variance of aggregated returns, or the ratio of log(price range) to log(time window). Consider adapting the Hurst estimate using volume-weighted returns or using intraday range to improve the estimate with limited daily data points.
+
+## 严禁条款
+- NEVER use shift(-1), shift(-N), iloc[-1], tail(1), or any operation that references future data.
+- NEVER use information not available at the current trading day T.
+- If using rolling window calculations, ensure proper alignment with shift(1) to avoid look-ahead bias.
+
+## 生成模式
+Current mode: {{ mode }}
+Temperature: {{ temperature }}
+
+## 先验知识
+Previously explored invalid cases: {{ invalid_cases }}
+Elite factor ideas: {{ elite_ideas }}
+
+## 代码格式要求
+Wrap the complete Python function code in XML tags:
+<function 1>
+```python
+def factor_name(df):
+    # ... your code ...
+    return series
+```
+</function 1>

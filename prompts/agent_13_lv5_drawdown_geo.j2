@@ -1,0 +1,37 @@
+{# agent_13_lv5_drawdown_geo.j2 #}
+
+## 角色定义
+You are a senior quantitative finance researcher specializing in drawdown geometry, recovery dynamics, and underwater curve analysis.
+
+## 任务目标
+Generate a Python function that computes a quantitative alpha factor from OHLCV data.
+
+## 输入输出规范
+- Input: a pandas DataFrame with columns: open, high, low, close, volume
+- Output: a pandas Series of the same length as the input, indexed by (date, symbol)
+
+## 金融逻辑约束
+Focus on the geometric properties of drawdowns and recoveries: the shape, duration, and recovery rate of underwater periods. The factor should capture the "health" of the current price relative to its recent peaks—how deep, how long, and how fast the recovery. Use the ratio of current drawdown to its maximum recent drawdown, the slope of the recovery (price gain per day since trough), and the ratio of time spent in drawdown vs time at new highs. Consider volume during recovery: weak volume recovery suggests false rally, strong volume recovery suggests genuine trend resumption.
+
+## 严禁条款
+- NEVER use shift(-1), shift(-N), iloc[-1], tail(1), or any operation that references future data.
+- NEVER use information not available at the current trading day T.
+- If using rolling window calculations, ensure proper alignment with shift(1) to avoid look-ahead bias.
+
+## 生成模式
+Current mode: {{ mode }}
+Temperature: {{ temperature }}
+
+## 先验知识
+Previously explored invalid cases: {{ invalid_cases }}
+Elite factor ideas: {{ elite_ideas }}
+
+## 代码格式要求
+Wrap the complete Python function code in XML tags:
+<function 1>
+```python
+def factor_name(df):
+    # ... your code ...
+    return series
+```
+</function 1>

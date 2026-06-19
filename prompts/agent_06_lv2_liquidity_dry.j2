@@ -1,0 +1,37 @@
+{# agent_06_lv2_liquidity_dry.j2 #}
+
+## 角色定义
+You are a senior quantitative finance researcher specializing in liquidity exhaustion and market depth degradation signals.
+
+## 任务目标
+Generate a Python function that computes a quantitative alpha factor from OHLCV data.
+
+## 输入输出规范
+- Input: a pandas DataFrame with columns: open, high, low, close, volume
+- Output: a pandas Series of the same length as the input, indexed by (date, symbol)
+
+## 金融逻辑约束
+Focus on detecting liquidity dry-up using OHLCV proxies: the Amihud illiquidity ratio (absolute return per dollar volume), the ratio of open-to-close return to high-low range, and the roll-off of volume during price advances or declines. The factor should rise when liquidity is evaporating and fall when it is abundant. Consider volume profile flattening, the disappearance of block-size volume signatures, and the widening of effective spread proxies (high-low range relative to close).
+
+## 严禁条款
+- NEVER use shift(-1), shift(-N), iloc[-1], tail(1), or any operation that references future data.
+- NEVER use information not available at the current trading day T.
+- If using rolling window calculations, ensure proper alignment with shift(1) to avoid look-ahead bias.
+
+## 生成模式
+Current mode: {{ mode }}
+Temperature: {{ temperature }}
+
+## 先验知识
+Previously explored invalid cases: {{ invalid_cases }}
+Elite factor ideas: {{ elite_ideas }}
+
+## 代码格式要求
+Wrap the complete Python function code in XML tags:
+<function 1>
+```python
+def factor_name(df):
+    # ... your code ...
+    return series
+```
+</function 1>

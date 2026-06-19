@@ -1,0 +1,2 @@
+[console_scripts]
+cogalpha = cogalpha.cli:main

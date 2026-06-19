@@ -1,2 +1,1 @@
-"""CogAlpha factor mining framework."""
-__version__ = "0.1.0"
+"""CogAlpha agents package."""

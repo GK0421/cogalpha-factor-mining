@@ -1,0 +1,98 @@
+Metadata-Version: 2.4
+Name: cogalpha-factor-mining
+Version: 0.1.0
+Summary: CogAlpha全自动因子挖掘框架 MVP
+Author: CogAlpha Team
+License: MIT
+Keywords: quant,factor-mining,alpha,llm,evolution
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Financial and Insurance Industry
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=1.4
+Requires-Dist: numpy>=1.21
+Requires-Dist: scipy>=1.7
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: jinja2>=3.0
+Requires-Dist: tqdm>=4.60
+Requires-Dist: tenacity>=8.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: openai>=1.0; extra == "dev"
+
+# CogAlpha Factor Mining MVP
+
+> **DISCLAIMER**: This MVP uses synthetic/mock data and a mock LLM provider. Results do NOT represent real investment performance. Real-market validation requires actual OHLCV data and a real LLM API.
+
+## Quick Start
+
+```bash
+# 1. Clone and enter the repo
+git clone https://github.com/GK0421/cogalpha-factor-mining.git
+cd cogalpha-factor-mining
+
+# 2. Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or: venv\Scripts\activate  # Windows
+
+# 3. Install dependencies
+pip install -e ".[dev]"
+
+# 4. Copy example config and run MVP
+cp config.example.yaml config.yaml
+python examples/run_mvp.py
+
+# 5. Run tests
+pytest tests/ -v
+```
+
+## CLI Usage
+
+```bash
+# Initialize project structure
+python -m cogalpha.cli init
+
+# Validate data file
+python -m cogalpha.cli validate-data --config config.example.yaml
+
+# Run MVP pipeline
+python -m cogalpha.cli run-mvp --config config.example.yaml
+
+# Generate report
+python -m cogalpha.cli report
+```
+
+## Project Structure
+
+```
+cogalpha-factor-mining/
+  src/cogalpha/          # Core package
+    config.py             # Configuration loader & validator
+    data/                 # Data loading, validation, synthetic generation
+    agents/               # 21-agent registry & prompt system
+    llm/                  # LLM providers (mock + OpenAI-compatible)
+    factors/              # Factor object, parser, quality, leakage, evaluator
+    evolution/            # Elite pool, feedback, evolution loop
+    reports/              # Report writer
+    cli.py                # Command-line interface
+  prompts/                # 21 Jinja2 prompt templates
+  tests/                  # Unit & integration tests
+  examples/               # Example scripts
+  docs/                   # Documentation
+```
+
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SPEC_FROM_MANUAL.md](docs/SPEC_FROM_MANUAL.md).
+
+## License
+
+MIT
