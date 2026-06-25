@@ -9,6 +9,7 @@ src/cogalpha/agents/prompt_renderer.py
 src/cogalpha/agents/prompt_templates.py
 src/cogalpha/agents/registry.py
 src/cogalpha/data/__init__.py
+src/cogalpha/data/akshare_loader.py
 src/cogalpha/data/loader.py
 src/cogalpha/data/synthetic.py
 src/cogalpha/data/validator.py
