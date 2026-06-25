@@ -1,5 +1,4 @@
 """QualityChecker — static and lightweight runtime checks for generated factors."""
-
 import ast
 import re
 
@@ -10,132 +9,75 @@ import numpy as np
 class QualityChecker:
     """Check generated code for common anti-patterns and structural issues."""
 
-    # Patterns that indicate future-information leakage
     LEAKAGE_PATTERNS = [
         (r'shift\s*\(\s*-\d+\s*\)', "shift(-N) uses future data"),
         (r'iloc\s*\[\s*-\d+\s*\]', "iloc[-N] uses future data"),
-        (r'tail\s*\(\s*\d*\s*\)', "tail(N) can look ahead at the end of a group"),
+        (r'tail\s*\(\s*\d*\s*\)', "tail(N) can look ahead"),
         (r'at\s*\[\s*-1\s*,', "at[-1, ...] uses future data"),
         (r'iat\s*\[\s*-1\s*,', "iat[-1, ...] uses future data"),
         (r'\.loc\s*\[\s*[^\]]*today\s*:\s*\]', "forward-looking .loc slice"),
     ]
 
+    def _ast(self, code: str) -> ast.AST | None:
+        try:
+            return ast.parse(code)
+        except SyntaxError as e:
+            return e  # type: ignore
+
     def scan(self, code: str) -> dict:
         """Scan code for suspicious patterns and structural issues."""
-        errors = []
-        warnings = []
-
-        for pattern, message in self.LEAKAGE_PATTERNS:
-            if re.search(pattern, code):
-                warnings.append(f"Future leak warning: {message}")
-
-        # Additional structural checks via AST
-        try:
-            tree = ast.parse(code)
-        except SyntaxError as e:
-            errors.append(f"Syntax error: {e}")
-            return {"passed": False, "errors": errors, "warnings": warnings}
-
-        # Check for exactly one top-level function
-        func_defs = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-        if len(func_defs) == 0:
-            errors.append("No function definition found.")
-        elif len(func_defs) > 1:
-            warnings.append("Multiple function definitions found; only the first may be used.")
-
+        tree = self._ast(code)
+        if isinstance(tree, SyntaxError):
+            return {"passed": False, "errors": [f"Syntax error: {tree}"], "warnings": []}
+        funcs = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+        errors = ["No function definition found."] if not funcs else []
+        warnings = [f"Future leak: {msg}" for pat, msg in self.LEAKAGE_PATTERNS if re.search(pat, code)]
+        if len(funcs) > 1:
+            warnings.append("Multiple function definitions; only the first may be used.")
         return {"passed": len(errors) == 0, "errors": errors, "warnings": warnings}
 
     def check_signature(self, code: str) -> bool:
-        """Verify that the code contains exactly one top-level function
-        that takes exactly one positional argument.
-        """
-        try:
-            tree = ast.parse(code)
-        except SyntaxError:
+        """Verify exactly one top-level function with one positional arg and a return."""
+        tree = self._ast(code)
+        if isinstance(tree, SyntaxError):
             return False
-
-        top_level_funcs = [
-            node for node in ast.iter_child_nodes(tree)
-            if isinstance(node, ast.FunctionDef)
-        ]
-
-        if len(top_level_funcs) != 1:
+        funcs = [n for n in ast.iter_child_nodes(tree) if isinstance(n, ast.FunctionDef)]
+        if len(funcs) != 1:
             return False
-
-        func = top_level_funcs[0]
-        args = func.args
-        # Exactly one positional argument (no defaults, no *args, no **kwargs)
-        n_positional = len(args.args) + len(args.posonlyargs)
-        if n_positional != 1:
-            return False
-        if args.vararg or args.kwarg:
-            return False
-        if args.kwonlyargs:
-            return False
-        # (Optional) function should have a return statement
-        has_return = any(
-            isinstance(node, ast.Return) for node in ast.walk(func)
-        )
-        return has_return
+        a = funcs[0].args
+        return (len(a.args) + len(a.posonlyargs) == 1 and not a.vararg and not a.kwarg
+                and not a.kwonlyargs and any(isinstance(n, ast.Return) for n in ast.walk(funcs[0])))
 
     def check_runnable(self, code: str, df: pd.DataFrame) -> tuple[bool, str]:
-        """Execute the code in a sandboxed namespace and call the function."""
+        """Execute code in sandboxed namespace and call the function."""
         try:
-            namespace = {"pd": pd, "np": np}
-            exec(code, namespace)
-
-            # Find the function name
-            tree = ast.parse(code)
-            func_names = [
-                node.name for node in ast.walk(tree)
-                if isinstance(node, ast.FunctionDef)
-            ]
-            if not func_names:
-                return False, "No function definition found in code."
-
-            func = namespace[func_names[0]]
+            ns = {"pd": pd, "np": np}
+            exec(code, ns)
+            func = ns[next(n for n, o in ns.items() if callable(o) and n not in ("pd", "np"))]
             result = func(df)
-
-            if not isinstance(result, (pd.Series, pd.DataFrame)):
-                return False, f"Function returned {type(result)}, expected pd.Series or pd.DataFrame."
-            return True, ""
+            return isinstance(result, (pd.Series, pd.DataFrame)), (
+                "" if isinstance(result, (pd.Series, pd.DataFrame)) else f"Expected Series/DataFrame, got {type(result)}"
+            )
         except Exception as e:
             return False, f"Runtime error: {e}"
 
     def full_check(self, code: str, df: pd.DataFrame) -> dict:
-        """Run all checks and return a unified report."""
-        scan_result = self.scan(code)
-        sig_ok = self.check_signature(code)
+        scan = self.scan(code)
         run_ok, run_msg = self.check_runnable(code, df)
-
-        errors = list(scan_result["errors"])
-        warnings = list(scan_result["warnings"])
-
-        if not sig_ok:
-            errors.append("Invalid function signature: must be exactly one top-level function with one argument.")
+        errors = list(scan["errors"]) + (["Invalid signature"] if not self.check_signature(code) else [])
         if not run_ok:
             errors.append(run_msg)
-
-        return {
-            "passed": len(errors) == 0,
-            "errors": errors,
-            "warnings": warnings,
-        }
+        return {"passed": len(errors) == 0, "errors": errors, "warnings": scan["warnings"]}
 
     def check(self, factor) -> bool:
-        """MVP helper: check a FactorObject and update its status."""
-        # We need a DataFrame to run full_check; for MVP we do a lightweight check
+        """MVP lightweight check on a FactorObject."""
         from cogalpha.factors.object import FactorObject
         if not isinstance(factor, FactorObject):
             return False
-        code = factor.raw_code
-        scan = self.scan(code)
-        sig_ok = self.check_signature(code)
-        if not scan["passed"] or not sig_ok:
-            factor.status = "invalid"
-            factor.error_type = "syntax" if any("Syntax" in e for e in scan["errors"]) else "logic"
-            factor.errors = scan["errors"] + (["Invalid signature"] if not sig_ok else [])
-            return False
-        factor.status = "valid"
-        factor.error_type = None
-        return True
+        s = self.scan(factor.raw_code)
+        sig = self.check_signature(factor.raw_code)
+        ok = s["passed"] and sig
+        factor.status = "valid" if ok else "invalid"
+        factor.error_type = None if ok else ("syntax" if any("Syntax" in e for e in s["errors"]) else "logic")
+        factor.errors = ([] if ok else s["errors"] + (["Invalid signature"] if not sig else []))
+        return ok

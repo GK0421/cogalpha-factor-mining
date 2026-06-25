@@ -10,30 +10,11 @@ import yaml
 from pydantic import BaseModel, Field
 
 
-class OpenAIConfig(BaseModel):
-    api_key: str = "${OPENAI_API_KEY}"
-    base_url: str = "https://api.openai.com/v1"
-    model: str = "gpt-4o-mini"
-    max_concurrent_requests: int = 5
-    max_tokens: int = 2048
-    timeout: int = 60
-    temperature: float = 0.7
-
-
-class DeepSeekConfig(BaseModel):
-    api_key: str = "${DEEPSEEK_API_KEY}"
-    base_url: str = "https://api.deepseek.com/v1"
-    model: str = "deepseek-chat"
-    max_concurrent_requests: int = 5
-    max_tokens: int = 2048
-    timeout: int = 60
-    temperature: float = 0.7
-
-
-class QwenConfig(BaseModel):
-    api_key: str = "${QWEN_API_KEY}"
-    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    model: str = "qwen-max"
+class LLMConfig(BaseModel):
+    """Generic LLM provider configuration."""
+    api_key: str = "${API_KEY}"
+    base_url: str = ""
+    model: str = ""
     max_concurrent_requests: int = 5
     max_tokens: int = 2048
     timeout: int = 60
@@ -42,9 +23,15 @@ class QwenConfig(BaseModel):
 
 class APIConfig(BaseModel):
     provider: str = "mock"
-    openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
-    deepseek: DeepSeekConfig = Field(default_factory=DeepSeekConfig)
-    qwen: QwenConfig = Field(default_factory=QwenConfig)
+    openai: LLMConfig = Field(default_factory=lambda: LLMConfig(
+        api_key="${OPENAI_API_KEY}", base_url="https://api.openai.com/v1", model="gpt-4o-mini"
+    ))
+    deepseek: LLMConfig = Field(default_factory=lambda: LLMConfig(
+        api_key="${DEEPSEEK_API_KEY}", base_url="https://api.deepseek.com/v1", model="deepseek-chat"
+    ))
+    qwen: LLMConfig = Field(default_factory=lambda: LLMConfig(
+        api_key="${QWEN_API_KEY}", base_url="https://dashscope.aliyuncs.com/compatible-mode/v1", model="qwen-max"
+    ))
 
 
 class DataConfig(BaseModel):
@@ -70,18 +57,11 @@ class EvolutionConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     total_agents: int = 21
-    generation_mode_probability: list[float] = Field(
-        default_factory=lambda: [0.2, 0.2, 0.2, 0.2, 0.2]
-    )
-    temperature_range_per_mode: dict[str, list[float]] = Field(
-        default_factory=lambda: {
-            "mild": [0.1, 0.3],
-            "moderate": [0.3, 0.5],
-            "creative": [0.5, 0.7],
-            "divergent": [0.7, 0.9],
-            "concrete": [0.5, 0.7],
-        }
-    )
+    generation_mode_probability: list[float] = Field(default_factory=lambda: [0.2] * 5)
+    temperature_range_per_mode: dict[str, list[float]] = Field(default_factory=lambda: {
+        "mild": [0.1, 0.3], "moderate": [0.3, 0.5], "creative": [0.5, 0.7],
+        "divergent": [0.7, 0.9], "concrete": [0.5, 0.7],
+    })
     max_retry_on_error: int = 3
 
 
@@ -107,20 +87,15 @@ class Config(BaseModel):
 
     def _redact(self, obj: Any) -> Any:
         if isinstance(obj, dict):
-            return {
-                k: "***REDACTED***" if "api_key" in k else self._redact(v)
-                for k, v in obj.items()
-            }
+            return {k: "***REDACTED***" if "api_key" in k else self._redact(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._redact(item) for item in obj]
         return obj
 
     def __str__(self) -> str:
-        redacted = self._redact(self.model_dump())
-        return f"Config({redacted})"
+        return f"Config({self._redact(self.model_dump())})"
 
-    def __repr__(self) -> str:
-        return self.__str__()
+    __repr__ = __str__
 
 
 def _resolve_env_vars(obj: Any) -> Any:
@@ -128,11 +103,8 @@ def _resolve_env_vars(obj: Any) -> Any:
         return {k: _resolve_env_vars(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_resolve_env_vars(item) for item in obj]
-    elif isinstance(obj, str):
-        if obj.startswith("${") and obj.endswith("}"):
-            var_name = obj[2:-1]
-            return os.environ.get(var_name, obj)
-        return obj
+    elif isinstance(obj, str) and obj.startswith("${") and obj.endswith("}"):
+        return os.environ.get(obj[2:-1], obj)
     return obj
 
 
@@ -141,6 +113,4 @@ def load_config(path: str | Path) -> Config:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-    resolved = _resolve_env_vars(raw)
-    return Config.model_validate(resolved)
+        return Config.model_validate(_resolve_env_vars(yaml.safe_load(f) or {}))

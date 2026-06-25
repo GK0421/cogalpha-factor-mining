@@ -1,5 +1,4 @@
 """LeakageDetector — empirically test for forward-looking bias in factors."""
-
 import ast
 import random
 
@@ -12,179 +11,90 @@ class LeakageDetector:
 
     @staticmethod
     def detect(code: str, df: pd.DataFrame, n_trials: int = 5) -> dict:
-        """
-        Run the factor on full data and on truncated data up to each sampled date.
-        If the values differ at the sampled date, the factor is using future data.
-        """
-        # Parse and execute to get the function object
+        """Run factor on full data and truncated data; differing values at sampled date = leakage."""
         try:
             tree = ast.parse(code)
-            func_names = [
-                node.name for node in ast.walk(tree)
-                if isinstance(node, ast.FunctionDef)
-            ]
+            func_names = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
             if not func_names:
-                return {
-                    "suspected_leakage": True,
-                    "trials": [],
-                    "max_diff": np.nan,
-                    "failed_dates": [],
-                    "error": "No function definition found.",
-                }
-
-            namespace = {"pd": pd, "np": np}
-            exec(code, namespace)
-            func = namespace[func_names[0]]
+                return _error("No function definition found.")
+            ns = {"pd": pd, "np": np}
+            exec(code, ns)
+            func = ns[func_names[0]]
         except Exception as e:
-            return {
-                "suspected_leakage": True,
-                "trials": [],
-                "max_diff": np.nan,
-                "failed_dates": [],
-                "error": f"Failed to parse/execute code: {e}",
-            }
+            return _error(f"Failed to parse/execute code: {e}")
 
-        # Ensure DataFrame has a DatetimeIndex
-        if not isinstance(df.index, pd.DatetimeIndex):
-            # Try to infer from a 'date' column or MultiIndex level
-            if "date" in df.columns:
-                df = df.set_index("date")
-            elif isinstance(df.index, pd.MultiIndex):
-                # Assume level 0 is date, level 1 is symbol
-                df = df.reset_index(level=1)
-            df.index = pd.to_datetime(df.index)
-
-        unique_dates = df.index.unique().sort_values()
-        if len(unique_dates) < n_trials:
-            n_trials = len(unique_dates)
+        df = _ensure_datetime(df)
+        dates = df.index.unique().sort_values()
+        n_trials = min(n_trials, len(dates))
         if n_trials == 0:
-            return {
-                "suspected_leakage": False,
-                "trials": [],
-                "max_diff": np.nan,
-                "failed_dates": [],
-            }
+            return {"suspected_leakage": False, "trials": [], "max_diff": np.nan, "failed_dates": []}
 
-        sampled_dates = random.sample(list(unique_dates), n_trials)
-        sampled_dates = sorted(sampled_dates)
+        sampled = sorted(random.sample(list(dates), n_trials))
+        trials, failed_dates, max_diff = [], [], 0.0
 
-        trials = []
-        failed_dates = []
-        max_diff = 0.0
-
-        for date in sampled_dates:
+        for d in sampled:
             try:
-                result_full = func(df)
-                # Truncate to dates <= date (inclusive)
-                df_trunc = df[df.index <= date]
-                result_trunc = func(df_trunc)
+                full, trunc = func(df), func(df[df.index <= d])
             except Exception as e:
-                trials.append({"date": date, "error": str(e)})
-                failed_dates.append(str(date))
+                trials.append({"date": d, "error": str(e)})
+                failed_dates.append(str(d))
                 continue
+            vf, vt = _at_date(full, d), _at_date(trunc, d)
+            leaked, diff = _compare(vf, vt)
+            trials.append({"date": d, "full": vf, "trunc": vt, "diff": diff})
+            if leaked:
+                failed_dates.append(str(d))
+            max_diff = max(max_diff, diff) if not np.isnan(diff) else max_diff
 
-            # Extract all values at the sampled date (handles MultiIndex)
-            vals_full = _extract_at_date(result_full, date)
-            vals_trunc = _extract_at_date(result_trunc, date)
-
-            # Compare all values at this date
-            date_failed = False
-            date_max_diff = 0.0
-            if not vals_full or not vals_trunc:
-                # If one side has no values and the other does, treat as leakage
-                if bool(vals_full) != bool(vals_trunc):
-                    date_failed = True
-                    date_max_diff = 1.0
-            elif len(vals_full) != len(vals_trunc):
-                date_failed = True
-                # Compute diff on common prefix
-                common_len = min(len(vals_full), len(vals_trunc))
-                for i in range(common_len):
-                    diff = _safe_diff(vals_full[i], vals_trunc[i])
-                    if not np.isnan(diff) and diff > date_max_diff:
-                        date_max_diff = diff
-                # If no difference in common prefix but lengths differ, set a positive diff
-                if date_max_diff <= 1e-10:
-                    date_max_diff = 1.0
-            else:
-                for vf, vt in zip(vals_full, vals_trunc):
-                    diff = _safe_diff(vf, vt)
-                    if not np.isnan(diff) and diff > 1e-10:
-                        date_failed = True
-                    if not np.isnan(diff) and diff > date_max_diff:
-                        date_max_diff = diff
-
-            trials.append({
-                "date": date,
-                "full": vals_full,
-                "trunc": vals_trunc,
-                "diff": date_max_diff,
-            })
-
-            if date_failed:
-                failed_dates.append(str(date))
-
-            if not np.isnan(date_max_diff) and date_max_diff > max_diff:
-                max_diff = date_max_diff
-
-        suspected = len(failed_dates) > 0
-
-        return {
-            "suspected_leakage": suspected,
-            "trials": trials,
-            "max_diff": max_diff,
-            "failed_dates": failed_dates,
-        }
+        return {"suspected_leakage": bool(failed_dates), "trials": trials, "max_diff": max_diff, "failed_dates": failed_dates}
 
     def check(self, factor) -> bool:
-        """MVP helper: check a FactorObject for leakage and update its status."""
+        """MVP lightweight keyword scan for future-info leakage."""
         from cogalpha.factors.object import FactorObject
         if not isinstance(factor, FactorObject):
             return False
-        # Lightweight keyword scan for MVP (full detect requires DataFrame)
         code = factor.raw_code.lower()
-        future_keywords = ["shift(-", "lead(", "future", "tomorrow", "next_close", "next_day"]
-        for kw in future_keywords:
+        for kw in ("shift(-", "lead(", "future", "tomorrow", "next_close", "next_day"):
             if kw in code:
                 factor.status = "invalid"
                 factor.error_type = "future_info"
-                factor.errors.append(f"Future info leakage detected: {kw}")
+                factor.errors.append(f"Future info leakage: {kw}")
                 return False
         return True
 
 
-def _extract_at_date(result, date):
-    """Extract all values from a Series or DataFrame at a given date."""
+def _error(msg: str) -> dict:
+    return {"suspected_leakage": True, "trials": [], "max_diff": np.nan, "failed_dates": [], "error": msg}
+
+
+def _ensure_datetime(df: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if "date" in df.columns:
+            df = df.set_index("date")
+        elif isinstance(df.index, pd.MultiIndex):
+            df = df.reset_index(level=1)
+        df.index = pd.to_datetime(df.index)
+    return df
+
+
+def _at_date(result, date):
+    """Extract all non-NaN values from a Series or DataFrame at a given date."""
     try:
+        is_multi = isinstance(result.index, pd.MultiIndex)
         if isinstance(result, pd.Series):
-            if isinstance(result.index, pd.MultiIndex):
-                vals = result.xs(date, level=0)
-                return vals.dropna().tolist() if len(vals) > 0 else []
-            else:
-                mask = result.index == date
-                return result[mask].dropna().tolist() if mask.any() else []
+            vals = result.xs(date, level=0) if is_multi else result[result.index == date]
         elif isinstance(result, pd.DataFrame):
-            if isinstance(result.index, pd.MultiIndex):
-                vals = result.xs(date, level=0)
-                # Flatten to list of scalars
-                flat = vals.values.flatten()
-                return [v for v in flat if not pd.isna(v)] if len(vals) > 0 else []
-            else:
-                mask = result.index == date
-                if mask.any():
-                    flat = result[mask].values.flatten()
-                    return [v for v in flat if not pd.isna(v)]
-                return []
+            vals = result.xs(date, level=0) if is_multi else result[result.index == date]
         else:
             return []
+        return [v for v in (vals.values.flatten() if isinstance(result, pd.DataFrame) else vals.tolist()) if not pd.isna(v)]
     except Exception:
         return []
 
 
-def _safe_diff(a, b):
-    """Compute absolute difference robust to NaN."""
-    if pd.isna(a) and pd.isna(b):
-        return 0.0
-    if pd.isna(a) or pd.isna(b):
-        return np.nan
-    return abs(float(a) - float(b))
+def _compare(full, trunc) -> tuple[bool, float]:
+    """Return (leaked, max_diff)."""
+    if not full or not trunc:
+        return bool(full) != bool(trunc), 1.0
+    diff = max(abs(float(a) - float(b)) for a, b in zip(full, trunc)) if len(full) == len(trunc) else 1.0
+    return diff > 1e-10, diff
